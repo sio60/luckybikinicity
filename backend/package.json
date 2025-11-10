@@ -1,0 +1,14 @@
+{
+  "name": "fortune-backend",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "wrangler dev src/index.js",
+    "deploy": "wrangler deploy src/index.js"
+  },
+  "devDependencies": {
+    "wrangler": "^4.46.0"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1"
+  }
+}
