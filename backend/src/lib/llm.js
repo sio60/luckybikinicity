@@ -40,45 +40,68 @@ export async function generateFortuneText(env, { birthdate, name, timezone, cate
 - 말투는 부드럽고 친구 같은 느낌으로, 반말은 쓰지 말고 존댓말로 말해주세요.
 `;
 
-  const body = {
-    contents: [
-      {
-        role: "user",
-        parts: [{ text: systemPrompt + "\n\n" + userPrompt }],
+  const attemptTokenLimits = [300, 1024];
+  let lastDebugInfo = null;
+
+  for (const maxOutputTokens of attemptTokenLimits) {
+    const body = {
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: systemPrompt + "\n\n" + userPrompt }],
+        },
+      ],
+      generationConfig: {
+        temperature: 0.8,
+        maxOutputTokens,
       },
-    ],
-    generationConfig: {
-      temperature: 0.8,
-      maxOutputTokens: 300,
-    },
-  };
+    };
 
-  const res = await fetch(`${GEMINI_ENDPOINT}?key=${apiKey}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
+    const res = await fetch(`${GEMINI_ENDPOINT}?key=${apiKey}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Gemini API error: ${res.status} ${text}`);
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`Gemini API error: ${res.status} ${text}`);
+    }
+
+    const data = await res.json();
+
+    try {
+      console.log("[Gemini raw]", JSON.stringify(data).slice(0, 500) + "...");
+    } catch { }
+
+    const candidate = data.candidates?.[0];
+    const parts =
+      candidate?.content?.parts?.filter((part) => typeof part?.text === "string") || [];
+    const text = parts.map((p) => p.text || "").join("\n").trim();
+    const finishReason = candidate?.finishReason || data.finishReason || "unknown";
+
+    lastDebugInfo = {
+      finishReason,
+      safetyRatings: candidate?.safetyRatings,
+      promptFeedback: data.promptFeedback,
+      tokenLimit: maxOutputTokens,
+    };
+
+    if (text) {
+      return text
+        .replace(/100%/g, "꽤 높은 확률로")
+        .replace(/반드시/g, "될 가능성이 커요");
+    }
+
+    if (finishReason !== "MAX_TOKENS") {
+      break;
+    }
   }
 
-  const data = await res.json();
+  console.warn("Gemini 빈 응답으로 기본 문구 반환", JSON.stringify(lastDebugInfo, null, 2));
 
-  const candidate = data.candidates?.[0];
-  const parts = candidate?.content?.parts || [];
-  const text = parts.map((p) => p.text || "").join("\n").trim();
-
-  if (!text) {
-    throw new Error("Gemini returned empty text");
-  }
-
-  const safeText = text
-    .replace(/100%/g, "꽤 높은 확률로")
-    .replace(/반드시/g, "될 가능성이 커요");
-
-  return safeText;
+  return `오늘 하루는 너무 결과에 집착하기보다, 스스로를 돌보는 데 조금 더 신경 써보면 좋을 것 같아요.
+가벼운 산책이나 스트레칭, 따뜻한 차 한 잔처럼 몸과 마음을 풀어줄 수 있는 작은 휴식을 꼭 챙겨보세요.`;
 }
