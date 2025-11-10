@@ -25,3 +25,12 @@ eas build -p android --profile preview
 eas build:view --latest --platform android --open
 npm i @react-native-picker/picker
 eas build -p android --profile preview --clear-cache
+
+
+# install
+npm i @react-navigation/native @react-navigation/native-stack
+npm i react-native-screens react-native-safe-area-context
+npm i expo-font expo-linking expo-secure-store
+npm i react-native-paper
+npm i react-native-safe-area-context
+npx expo install react-native-gesture-handler
