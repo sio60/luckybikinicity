@@ -38,3 +38,4 @@ npm i react-native-safe-area-context
 npx expo install react-native-gesture-handler
 rm -rf .eas
 eas update:configure
+npm i @react-native-async-storage/async-storage
