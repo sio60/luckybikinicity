@@ -2,8 +2,8 @@
   "name": "fortune-backend",
   "version": "1.0.0",
   "scripts": {
-    "dev": "wrangler dev src/index.js",
-    "deploy": "wrangler deploy src/index.js"
+    "dev": "wrangler dev --ip 0.0.0.0 --port 8787",
+    "deploy": "wrangler deploy"
   },
   "devDependencies": {
     "wrangler": "^4.46.0"

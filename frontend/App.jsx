@@ -12,9 +12,13 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useFonts } from "expo-font";
 
 import HomeScreen from "./src/screens/HomeScreen";
-// ⬇️ 채팅형 화면으로 교체
 import ChatFortuneScreen from "./src/screens/ChatFortuneScreen";
 import { Colors } from "./src/theme/colors";
+
+
+import { API_BASE } from "./src/lib/api";
+console.log("App loaded, API_BASE:", API_BASE);
+
 
 const Stack = createNativeStackNavigator();
 
@@ -73,7 +77,7 @@ export default function App() {
               />
               <Stack.Screen
                 name="Fortune"
-                component={ChatFortuneScreen} // ⬅️ 여기!
+                component={ChatFortuneScreen}
                 options={{ title: "LuckyBikiniCity" }}
               />
             </Stack.Navigator>
