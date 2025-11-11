@@ -1,4 +1,3 @@
-// src/screens/ChatFortuneScreen.jsx
 import React, { useEffect, useRef, useState } from "react";
 import {
   View,
@@ -6,79 +5,113 @@ import {
   TextInput,
   ScrollView,
   Pressable,
-  Platform,
   Keyboard,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { Colors } from "../theme/colors";
 import Logo from "../components/Logo";
-import { api } from "../lib/api";
+import { useDeviceId } from "../hooks/useDeviceId";
+import { getLocalFortune, getFollowup } from "../lib/localFortune";
+import { calendarLabel, normGender, todayYMD } from "../lib/personalize";
+import { getJSON, setJSON } from "../lib/store";
 
+// ===== 설정 =====
 const CATEGORIES = ["오늘의 운세", "이름으로 보는 나는?", "커플 궁합", "사주"];
-const DEVICE_ID = `${Platform.OS}-local-dev-${Math.floor(Date.now() / 1000)}-${Math.floor(Math.random() * 1000)}`;
 const DEFAULT_TIMEZONE = "Asia/Seoul";
+const CHAT_KEY_PREFIX = "chat.v1"; // 저장 키 prefix
 
-// ✅ 한국어 라벨 → 백엔드 category 값 매핑
-function toApiCategory(label) {
-  switch (label) {
+const FOLLOWUP_CHIPS = [
+  { key: "love", label: "연애운?" },
+  { key: "money", label: "금전운?" },
+  { key: "health", label: "건강운?" },
+  { key: "work", label: "일·학업 팁?" },
+];
+const QUICK_CATEGORY_CHIPS = [
+  { label: "오늘의 운세" },
+  { label: "이름으로 보는 나는?" },
+  { label: "사주" },
+  { label: "커플 궁합" },
+];
+
+const defaultForm = () => ({
+  name: "",
+  birthdate: "",
+  gender: "",
+  calendar: "양력",
+  couple: { a: { name: "", birthdate: "" }, b: { name: "", birthdate: "" } },
+});
+
+// ===== 유틸 =====
+function stepsFor(cat) {
+  switch (cat) {
     case "오늘의 운세":
-      return "today";
-    case "이름으로 보는 나는?":
-      return "name";
-    case "커플 궁합":
-      return "compat";
     case "사주":
-      return "saju";
+      return ["name", "birthdate", "gender", "calendar"];
+    case "이름으로 보는 나는?":
+      return ["name", "gender"];
+    case "커플 궁합":
+      return ["aName", "aBirthdate", "bName", "bBirthdate"];
     default:
-      return "today";
+      return ["name"];
   }
 }
-
-// ✅ 카테고리/입력값 → 백엔드로 보낼 payload 만드는 헬퍼
-function buildRequestBody(categoryLabel, userInput) {
-  const apiCategory = toApiCategory(categoryLabel);
-
-  // 이름 운세: 이름만 전송
-  if (apiCategory === "name") {
-    return {
-      category: "name",
-      name: userInput,
-      timezone: DEFAULT_TIMEZONE,
-    };
-  }
-
-  // 오늘의 운세 / 사주: 생년월일만 전송 (YYYY-MM-DD 형식 기대)
-  if (apiCategory === "today" || apiCategory === "saju") {
-    return {
-      category: apiCategory,
-      birthdate: userInput,
-      timezone: DEFAULT_TIMEZONE,
-    };
-  }
-
-  // 커플 궁합: 일단 이름 한 명만 사용 (나중에 확장)
-  if (apiCategory === "compat") {
-    return {
-      category: "compat",
-      name: userInput,
-      timezone: DEFAULT_TIMEZONE,
-    };
-  }
-
-  // 안전용 기본값
-  return {
-    category: "today",
-    name: userInput,
-    timezone: DEFAULT_TIMEZONE,
+function toApiCategory(label) {
+  return label === "오늘의 운세"
+    ? "today"
+    : label === "이름으로 보는 나는?"
+    ? "name"
+    : label === "사주"
+    ? "saju"
+    : label === "커플 궁합"
+    ? "compat"
+    : "today";
+}
+function askFor(step) {
+  const map = {
+    name: "이름(또는 닉네임)을 알려주세요.",
+    birthdate: "생년월일은 언제인가요? (YYYY-MM-DD 또는 YYYYMMDD)",
+    gender: "성별을 알려주세요. (남/여/기타/비공개 가능)",
+    calendar: "양력/음력 중 무엇으로 볼까요? (양력 권장)",
+    aName: "A의 이름을 알려주세요.",
+    aBirthdate: "A의 생년월일은? (YYYY-MM-DD 또는 YYYYMMDD)",
+    bName: "B의 이름을 알려주세요.",
+    bBirthdate: "B의 생년월일은? (YYYY-MM-DD 또는 YYYYMMDD)",
   };
+  return map[step] || "입력해 주세요.";
+}
+// YYYYMMDD/느슨한 입력 → YYYY-MM-DD
+function normalizeBirth(input) {
+  const s = String(input).trim();
+  if (/^\d{8}$/.test(s)) {
+    const y = s.slice(0, 4),
+      m = s.slice(4, 6),
+      d = s.slice(6, 8);
+    return `${y}-${m}-${d}`;
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const only = s.replace(/\D/g, "");
+  if (only.length === 8) {
+    const y = only.slice(0, 4),
+      m = only.slice(4, 6),
+      d = only.slice(6, 8);
+    return `${y}-${m}-${d}`;
+  }
+  return null;
 }
 
+// ===== 화면 =====
 export default function ChatFortuneScreen() {
   const insets = useSafeAreaInsets();
-  const headerHeight = useHeaderHeight();
+  useHeaderHeight(); // (안 쓰지만 react-navigation 내부 레이아웃 유지용)
+  const deviceId = useDeviceId() || "anon";
+  const today = todayYMD(DEFAULT_TIMEZONE);
 
-  const [category, setCategory] = useState(null); // 한국어 라벨 상태
+  const [category, setCategory] = useState(null);
+  const [steps, setSteps] = useState([]);
+  const [curStepIdx, setCurStepIdx] = useState(0);
+  const [form, setForm] = useState(defaultForm());
+
   const [messages, setMessages] = useState([
     {
       id: "sys1",
@@ -87,123 +120,209 @@ export default function ChatFortuneScreen() {
     },
   ]);
   const [text, setText] = useState("");
-  const [barH, setBarH] = useState(0);
-  const [kbShown, setKbShown] = useState(false);
-  const [loading, setLoading] = useState(false);
 
+  // 바/키보드 높이 추적
+  const [barH, setBarH] = useState(0);
+  const [kbHeight, setKbHeight] = useState(0);
+  const [kbShown, setKbShown] = useState(false);
+
+  const [loading, setLoading] = useState(false);
+  const [showFollowups, setShowFollowups] = useState(false);
   const scrollRef = useRef(null);
 
+  // ---- 키보드 리스너 (안드로이드 절대 하단 바를 키보드 높이만큼 올림) ----
   useEffect(() => {
-    const sh = Keyboard.addListener("keyboardDidShow", () => setKbShown(true));
-    const hi = Keyboard.addListener("keyboardDidHide", () => setKbShown(false));
+    const sh = Keyboard.addListener("keyboardDidShow", (e) => {
+      setKbShown(true);
+      setKbHeight(e?.endCoordinates?.height || 0);
+    });
+    const hi = Keyboard.addListener("keyboardDidHide", () => {
+      setKbShown(false);
+      setKbHeight(0);
+    });
     return () => {
       sh.remove();
       hi.remove();
     };
   }, []);
 
+  // ---- 저장된 대화 불러오기 (오늘/기기 기준) ----
+  useEffect(() => {
+    if (!deviceId) return;
+    (async () => {
+      const key = `${CHAT_KEY_PREFIX}:${deviceId}:${today}`;
+      const saved = await getJSON(key, null);
+      if (saved && saved.date === today && Array.isArray(saved.messages)) {
+        setMessages(saved.messages);
+        setCategory(saved.category ?? null);
+        const s =
+          saved.steps ?? (saved.category ? stepsFor(saved.category) : []);
+        setSteps(s);
+        setCurStepIdx(saved.curStepIdx ?? 0);
+        setForm(saved.form ?? defaultForm());
+        setShowFollowups(!!saved.showFollowups);
+      }
+    })();
+  }, [deviceId, today]);
+
+  // ---- 대화/상태 변경 시 자동 저장 ----
+  useEffect(() => {
+    if (!deviceId) return;
+    const key = `${CHAT_KEY_PREFIX}:${deviceId}:${today}`;
+    const payload = {
+      date: today,
+      messages,
+      category,
+      steps,
+      curStepIdx,
+      form,
+      showFollowups,
+    };
+    setJSON(key, payload);
+  }, [
+    deviceId,
+    today,
+    messages,
+    category,
+    steps,
+    curStepIdx,
+    form,
+    showFollowups,
+  ]);
+
+  // ---- 스크롤 맨 아래로 ----
   useEffect(() => {
     scrollRef.current?.scrollToEnd({ animated: true });
-  }, [messages, category, barH, kbShown]);
+  }, [messages, category, barH, kbShown, kbHeight]);
+
+  function pushBot(t) {
+    setMessages((m) => [
+      ...m,
+      { id: `bot-${Date.now()}-${Math.random()}`, who: "bot", text: t },
+    ]);
+  }
+  function pushMe(t) {
+    setMessages((m) => [...m, { id: `me-${Date.now()}`, who: "me", text: t }]);
+  }
 
   function onPick(cat) {
     setCategory(cat);
+    const s = stepsFor(cat);
+    setSteps(s);
+    setCurStepIdx(0);
+    setForm(defaultForm());
+    setShowFollowups(false);
+
     setMessages((m) => [
       ...m,
       { id: `bot-${Date.now()}`, who: "bot", text: `${cat}를 볼게요.` },
-      ...(cat === "오늘의 운세"
-        ? [
-            {
-              id: `bot-q1-${Date.now()}`,
-              who: "bot",
-              text: "생년월일은 언제인가요? (YYYY-MM-DD)",
-            },
-          ]
-        : []),
-      ...(cat === "이름으로 보는 나는?"
-        ? [
-            {
-              id: `bot-q2-${Date.now()}`,
-              who: "bot",
-              text: "이름(또는 닉네임)을 알려주세요.",
-            },
-          ]
-        : []),
-      ...(cat === "사주"
-        ? [
-            {
-              id: `bot-q3-${Date.now()}`,
-              who: "bot",
-              text: "사주를 보고 싶은 분의 생년월일을 알려주세요. (YYYY-MM-DD)",
-            },
-          ]
-        : []),
-      // 커플 궁합도 나중에 질문 추가 가능
+      { id: `bot-q-${Date.now()}`, who: "bot", text: askFor(s[0]) },
     ]);
   }
 
-  // ✅ 메세지 보내기 + 백엔드 호출
+  function parseCal(s) {
+    const t = (s || "").trim();
+    if (/^음/.test(t) || /lunar/i.test(t)) return "음력";
+    return "양력";
+  }
+
   async function onSend() {
     const v = text.trim();
     if (!v || !category || loading) return;
 
-    // 1) 내 메시지 추가
-    const myMsg = { id: `me-${Date.now()}`, who: "me", text: v };
-    setMessages((m) => [...m, myMsg]);
+    pushMe(v);
     setText("");
 
-    // 2) 백엔드 요청
-    const body = buildRequestBody(category, v);
-    console.log("[Chat] send fortune request:", body);
+    const step = steps[curStepIdx];
+    if (step) {
+      if (step === "name") setForm((f) => ({ ...f, name: v }));
+      else if (step === "birthdate") {
+        const nv = normalizeBirth(v);
+        if (!nv)
+          return pushBot(
+            "형식은 YYYY-MM-DD 또는 YYYYMMDD 입니다. 예) 20010916"
+          );
+        setForm((f) => ({ ...f, birthdate: nv }));
+      } else if (step === "gender")
+        setForm((f) => ({ ...f, gender: normGender(v) }));
+      else if (step === "calendar")
+        setForm((f) => ({ ...f, calendar: parseCal(v) }));
+      else if (step === "aName")
+        setForm((f) => ({
+          ...f,
+          couple: { ...f.couple, a: { ...f.couple.a, name: v } },
+        }));
+      else if (step === "aBirthdate") {
+        const nv = normalizeBirth(v);
+        if (!nv)
+          return pushBot(
+            "형식은 YYYY-MM-DD 또는 YYYYMMDD 입니다. 예) 20010916"
+          );
+        setForm((f) => ({
+          ...f,
+          couple: { ...f.couple, a: { ...f.couple.a, birthdate: nv } },
+        }));
+      } else if (step === "bName")
+        setForm((f) => ({
+          ...f,
+          couple: { ...f.couple, b: { ...f.couple.b, name: v } },
+        }));
+      else if (step === "bBirthdate") {
+        const nv = normalizeBirth(v);
+        if (!nv)
+          return pushBot(
+            "형식은 YYYY-MM-DD 또는 YYYYMMDD 입니다. 예) 20010916"
+          );
+        setForm((f) => ({
+          ...f,
+          couple: { ...f.couple, b: { ...f.couple.b, birthdate: nv } },
+        }));
+      }
 
+      const next = curStepIdx + 1;
+      if (next < steps.length) {
+        setCurStepIdx(next);
+        pushBot(askFor(steps[next]));
+        return;
+      }
+    }
+
+    // 모든 입력 수집 완료 → 로컬 운세
     setLoading(true);
     try {
-      const res = await api.postFortuneToday({
-        body,
-        deviceId: DEVICE_ID,
-      });
+      const payload = {
+        category: toApiCategory(category),
+        timezone: DEFAULT_TIMEZONE,
+      };
+      if (payload.category === "compat") {
+        payload.couple = form.couple;
+      } else {
+        payload.name = form.name || v;
+        payload.birthdate = form.birthdate || "";
+        payload.gender = form.gender || "";
+        payload.calendar = calendarLabel(form.calendar);
+      }
 
-      console.log("[Chat] fortune response:", res);
-
-      const fortuneText =
-        res?.fortune ||
-        res?.text ||
-        "운세 응답을 불러오는 데 잠시 문제가 있었어요. 잠시 후 다시 시도해 주세요.";
-
-      setMessages((m) => [
-        ...m,
-        {
-          id: `bot-reply-${Date.now()}`,
-          who: "bot",
-          text: fortuneText,
-        },
-      ]);
-    } catch (e) {
-      console.error("[Chat] fortune error:", e);
-      setMessages((m) => [
-        ...m,
-        {
-          id: `bot-error-${Date.now()}`,
-          who: "bot",
-          text:
-            "서버와 통신 중 오류가 발생했어요. 네트워크 상태를 확인하시고 다시 시도해 주세요.",
-        },
-      ]);
+      const res = await getLocalFortune(payload, deviceId);
+      if (res.limited) pushBot(res.message);
+      else pushBot(res.text);
+      setShowFollowups(true);
+    } catch {
+      pushBot(
+        "로컬 운세 생성 중 오류가 발생했어요. 입력을 다시 확인해 주세요."
+      );
     } finally {
       setLoading(false);
     }
   }
 
-  const Wrapper =
-    Platform.OS === "ios" ? require("react-native").KeyboardAvoidingView : View;
-  const wrapperProps =
-    Platform.OS === "ios"
-      ? { behavior: "padding", keyboardVerticalOffset: headerHeight }
-      : {};
+  function onAskFollowup(tag) {
+    pushBot(getFollowup(tag));
+  }
 
+  // ===== 렌더 =====
   return (
-    <Wrapper style={{ flex: 1, backgroundColor: "#fff" }} {...wrapperProps}>
-      {/* 대화 영역 */}
+    <View style={{ flex: 1, backgroundColor: "#fff" }}>
       <ScrollView
         ref={scrollRef}
         keyboardShouldPersistTaps="handled"
@@ -213,7 +332,9 @@ export default function ChatFortuneScreen() {
         contentContainerStyle={{
           paddingTop: 12,
           paddingHorizontal: 12,
-          paddingBottom: kbShown ? 8 : barH + Math.max(insets.bottom, 8),
+          // 하단 바 + (키보드 떠있으면 키보드 높이만큼 더 확보)
+          paddingBottom:
+            barH + (kbShown ? kbHeight : Math.max(insets.bottom, 8)),
         }}
       >
         {messages.map((m) => {
@@ -255,12 +376,70 @@ export default function ChatFortuneScreen() {
             </View>
           );
         })}
+
+        {showFollowups && (
+          <View style={{ marginTop: 4, gap: 10 }}>
+            <Text style={{ color: "#666", marginLeft: 4 }}>다른 질문하기</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 8 }}
+            >
+              {FOLLOWUP_CHIPS.map((ch) => (
+                <Pressable
+                  key={ch.key}
+                  onPress={() => onAskFollowup(ch.key)}
+                  style={{
+                    paddingVertical: 8,
+                    paddingHorizontal: 12,
+                    borderRadius: 999,
+                    backgroundColor: "#f3f0ff",
+                  }}
+                >
+                  <Text style={{ color: Colors.primary, fontWeight: "700" }}>
+                    {ch.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+
+            <Text style={{ color: "#666", marginLeft: 4, marginTop: 6 }}>
+              카테고리 바꾸기
+            </Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 8 }}
+            >
+              {QUICK_CATEGORY_CHIPS.map((ch) => (
+                <Pressable
+                  key={ch.label}
+                  onPress={() => onPick(ch.label)}
+                  style={{
+                    paddingVertical: 8,
+                    paddingHorizontal: 12,
+                    borderRadius: 999,
+                    backgroundColor: "#f3f0ff",
+                  }}
+                >
+                  <Text style={{ color: Colors.primary, fontWeight: "700" }}>
+                    {ch.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        )}
       </ScrollView>
 
-      {/* 하단 바 */}
+      {/* ✅ 하단 바: absolute + 키보드 높이만큼 끌어올림(안드로이드 전용 느낌) */}
       <View
         onLayout={(e) => setBarH(e.nativeEvent.layout.height)}
         style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: kbShown ? kbHeight : 0, // ← 키보드에 딱 붙음
           borderTopWidth: 1,
           borderColor: Colors.border,
           backgroundColor: "#fff",
@@ -277,30 +456,22 @@ export default function ChatFortuneScreen() {
               gap: 8,
             }}
           >
-            {CATEGORIES.map((c) => {
-              const sel = c === category;
-              return (
-                <Pressable
-                  key={c}
-                  onPress={() => onPick(c)}
-                  style={{
-                    paddingVertical: 10,
-                    paddingHorizontal: 16,
-                    borderRadius: 999,
-                    backgroundColor: sel ? Colors.primary : "#f3f0ff",
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: sel ? "#fff" : Colors.primary,
-                      fontWeight: "700",
-                    }}
-                  >
-                    {c}
-                  </Text>
-                </Pressable>
-              );
-            })}
+            {CATEGORIES.map((c) => (
+              <Pressable
+                key={c}
+                onPress={() => onPick(c)}
+                style={{
+                  paddingVertical: 10,
+                  paddingHorizontal: 16,
+                  borderRadius: 999,
+                  backgroundColor: "#f3f0ff",
+                }}
+              >
+                <Text style={{ color: Colors.primary, fontWeight: "700" }}>
+                  {c}
+                </Text>
+              </Pressable>
+            ))}
           </ScrollView>
         )}
 
@@ -348,10 +519,12 @@ export default function ChatFortuneScreen() {
                   : Colors.primary,
             }}
           >
-            <Text style={{ color: "#fff", fontWeight: "700" }}>보내기</Text>
+            <Text style={{ color: "#fff", fontWeight: "700" }}>
+              {loading ? "..." : "보내기"}
+            </Text>
           </Pressable>
         </View>
       </View>
-    </Wrapper>
+    </View>
   );
 }

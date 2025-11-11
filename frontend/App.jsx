@@ -15,10 +15,8 @@ import HomeScreen from "./src/screens/HomeScreen";
 import ChatFortuneScreen from "./src/screens/ChatFortuneScreen";
 import { Colors } from "./src/theme/colors";
 
-
 import { API_BASE } from "./src/lib/api";
 console.log("App loaded, API_BASE:", API_BASE);
-
 
 const Stack = createNativeStackNavigator();
 
@@ -73,12 +71,12 @@ export default function App() {
               <Stack.Screen
                 name="Home"
                 component={HomeScreen}
-                options={{ title: "LuckyBikiniCity" }}
+                options={{ title: "JujuPick" }}
               />
               <Stack.Screen
                 name="Fortune"
                 component={ChatFortuneScreen}
-                options={{ title: "LuckyBikiniCity" }}
+                options={{ title: "JujuPick" }}
               />
             </Stack.Navigator>
           </NavigationContainer>

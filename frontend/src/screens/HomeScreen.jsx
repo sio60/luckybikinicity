@@ -7,7 +7,10 @@ import { Colors } from "../theme/colors";
 
 export default function HomeScreen({ navigation }) {
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.bg }} edges={["top"]}>
+    <SafeAreaView
+      style={{ flex: 1, backgroundColor: Colors.bg }}
+      edges={["top"]}
+    >
       <View
         style={{
           flex: 1,
@@ -26,11 +29,14 @@ export default function HomeScreen({ navigation }) {
             textAlign: "center",
           }}
         >
-          LuckyBikiniCity
+          JujuPick
         </Text>
 
         <View style={{ width: "100%", marginTop: 8 }}>
-          <PrimaryButton title="운세 보러 가기" onPress={() => navigation.navigate("Fortune")} />
+          <PrimaryButton
+            title="운세 보러 가기"
+            onPress={() => navigation.navigate("Fortune")}
+          />
         </View>
       </View>
     </SafeAreaView>

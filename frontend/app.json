@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "luckybikinicity",
+    "name": "JujuPick",
     "slug": "frontend",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -16,14 +16,14 @@
       "supportsTablet": true
     },
     "android": {
+      "softwareKeyboardLayoutMode": "resize",
       "package": "com.yunokio.frontend",
       "windowSoftInputMode": "adjustResize",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true,
-      "softwareKeyboardLayoutMode": "resize"
+      "edgeToEdgeEnabled": true
     },
     "web": { "favicon": "./assets/favicon.png" },
     "runtimeVersion": { "policy": "appVersion" },
