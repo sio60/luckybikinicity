@@ -4,11 +4,13 @@ compatibility_date = "2025-11-10"
 
 [[kv_namespaces]]
 binding = "FORTUNE_KV"
-id = "c1e52a0dd0ca4605980fca3060908509"
+id = "34196ddf62114b31a52def9922d23fd0"      # ✅ 방금 생성된 prod id
+preview_id = "7bde5e936fd548b2ab1ce73af22c6566" # ✅ 방금 생성된 preview id
 
 [vars]
 ENV = "dev"
-DEBUG = true
+DEBUG = "1"                     # toml의 vars는 문자열 권장
+GEMINI_MODEL = "gemini-1.5-flash"  # (선택) 기본 모델 고정
 
 [dev]
 port = 8787

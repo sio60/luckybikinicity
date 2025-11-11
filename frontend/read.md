@@ -26,6 +26,8 @@ eas build:view --latest --platform android --open
 npm i @react-native-picker/picker
 eas build -p android --profile preview --clear-cache
 
+# 이걸로
+eas update --branch preview --message "fortune fetch fix"
 
 # install
 npm i @react-navigation/native @react-navigation/native-stack
@@ -34,3 +36,5 @@ npm i expo-font expo-linking expo-secure-store
 npm i react-native-paper
 npm i react-native-safe-area-context
 npx expo install react-native-gesture-handler
+rm -rf .eas
+eas update:configure
