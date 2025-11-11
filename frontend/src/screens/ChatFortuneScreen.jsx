@@ -1,3 +1,4 @@
+// src/screens/ChatFortuneScreen.jsx
 import React, { useEffect, useRef, useState } from "react";
 import {
   View,
@@ -12,20 +13,20 @@ import { useHeaderHeight } from "@react-navigation/elements";
 import { Colors } from "../theme/colors";
 import Logo from "../components/Logo";
 import { useDeviceId } from "../hooks/useDeviceId";
-import { getLocalFortune, getFollowup } from "../lib/localFortune";
+import { getLocalFortune } from "../lib/localFortune";
 import { calendarLabel, normGender, todayYMD } from "../lib/personalize";
 import { getJSON, setJSON } from "../lib/store";
 
 // ===== 설정 =====
 const CATEGORIES = ["오늘의 운세", "이름으로 보는 나는?", "커플 궁합", "사주"];
 const DEFAULT_TIMEZONE = "Asia/Seoul";
-const CHAT_KEY_PREFIX = "chat.v1"; // 저장 키 prefix
+const CHAT_KEY_PREFIX = "chat.v1";
 
 const FOLLOWUP_CHIPS = [
-  { key: "love", label: "연애운?" },
-  { key: "money", label: "금전운?" },
-  { key: "health", label: "건강운?" },
-  { key: "work", label: "일·학업 팁?" },
+  { key: "love", label: "연애운" },
+  { key: "money", label: "금전운" },
+  { key: "health", label: "건강운" },
+  { key: "work", label: "일·학업 팁" },
 ];
 const QUICK_CATEGORY_CHIPS = [
   { label: "오늘의 운세" },
@@ -52,6 +53,12 @@ function stepsFor(cat) {
       return ["name", "gender"];
     case "커플 궁합":
       return ["aName", "aBirthdate", "bName", "bBirthdate"];
+    // 팔로우업 4종: 이름/생년월일/성별만
+    case "연애운":
+    case "금전운":
+    case "건강운":
+    case "일·학업 팁":
+      return ["name", "birthdate", "gender"];
     default:
       return ["name"];
   }
@@ -65,6 +72,14 @@ function toApiCategory(label) {
     ? "saju"
     : label === "커플 궁합"
     ? "compat"
+    : label === "연애운"
+    ? "love"
+    : label === "금전운"
+    ? "money"
+    : label === "건강운"
+    ? "health"
+    : label === "일·학업 팁"
+    ? "work"
     : "today";
 }
 function askFor(step) {
@@ -100,10 +115,9 @@ function normalizeBirth(input) {
   return null;
 }
 
-// ===== 화면 =====
 export default function ChatFortuneScreen() {
   const insets = useSafeAreaInsets();
-  useHeaderHeight(); // (안 쓰지만 react-navigation 내부 레이아웃 유지용)
+  useHeaderHeight(); // nav 레이아웃 유지용
   const deviceId = useDeviceId() || "anon";
   const today = todayYMD(DEFAULT_TIMEZONE);
 
@@ -121,7 +135,7 @@ export default function ChatFortuneScreen() {
   ]);
   const [text, setText] = useState("");
 
-  // 바/키보드 높이 추적
+  // 바/키보드 높이 추적 (Android)
   const [barH, setBarH] = useState(0);
   const [kbHeight, setKbHeight] = useState(0);
   const [kbShown, setKbShown] = useState(false);
@@ -130,7 +144,6 @@ export default function ChatFortuneScreen() {
   const [showFollowups, setShowFollowups] = useState(false);
   const scrollRef = useRef(null);
 
-  // ---- 키보드 리스너 (안드로이드 절대 하단 바를 키보드 높이만큼 올림) ----
   useEffect(() => {
     const sh = Keyboard.addListener("keyboardDidShow", (e) => {
       setKbShown(true);
@@ -146,7 +159,7 @@ export default function ChatFortuneScreen() {
     };
   }, []);
 
-  // ---- 저장된 대화 불러오기 (오늘/기기 기준) ----
+  // 저장 복원
   useEffect(() => {
     if (!deviceId) return;
     (async () => {
@@ -155,9 +168,8 @@ export default function ChatFortuneScreen() {
       if (saved && saved.date === today && Array.isArray(saved.messages)) {
         setMessages(saved.messages);
         setCategory(saved.category ?? null);
-        const s =
-          saved.steps ?? (saved.category ? stepsFor(saved.category) : []);
-        setSteps(s);
+        const s = saved.category ? stepsFor(saved.category) : [];
+        setSteps(saved.steps ?? s);
         setCurStepIdx(saved.curStepIdx ?? 0);
         setForm(saved.form ?? defaultForm());
         setShowFollowups(!!saved.showFollowups);
@@ -165,7 +177,6 @@ export default function ChatFortuneScreen() {
     })();
   }, [deviceId, today]);
 
-  // ---- 대화/상태 변경 시 자동 저장 ----
   useEffect(() => {
     if (!deviceId) return;
     const key = `${CHAT_KEY_PREFIX}:${deviceId}:${today}`;
@@ -190,7 +201,6 @@ export default function ChatFortuneScreen() {
     showFollowups,
   ]);
 
-  // ---- 스크롤 맨 아래로 ----
   useEffect(() => {
     scrollRef.current?.scrollToEnd({ animated: true });
   }, [messages, category, barH, kbShown, kbHeight]);
@@ -205,19 +215,34 @@ export default function ChatFortuneScreen() {
     setMessages((m) => [...m, { id: `me-${Date.now()}`, who: "me", text: t }]);
   }
 
-  function onPick(cat) {
-    setCategory(cat);
-    const s = stepsFor(cat);
+  function startFlowWithLabel(label) {
+    setCategory(label);
+    const s = stepsFor(label);
     setSteps(s);
     setCurStepIdx(0);
     setForm(defaultForm());
     setShowFollowups(false);
-
     setMessages((m) => [
       ...m,
-      { id: `bot-${Date.now()}`, who: "bot", text: `${cat}를 볼게요.` },
+      { id: `bot-${Date.now()}`, who: "bot", text: `${label}를 볼게요.` },
       { id: `bot-q-${Date.now()}`, who: "bot", text: askFor(s[0]) },
     ]);
+  }
+
+  function onPick(cat) {
+    startFlowWithLabel(cat);
+  }
+
+  function onStartFollowup(tagKey) {
+    const label =
+      tagKey === "love"
+        ? "연애운"
+        : tagKey === "money"
+        ? "금전운"
+        : tagKey === "health"
+        ? "건강운"
+        : "일·학업 팁";
+    startFlowWithLabel(label);
   }
 
   function parseCal(s) {
@@ -316,10 +341,6 @@ export default function ChatFortuneScreen() {
     }
   }
 
-  function onAskFollowup(tag) {
-    pushBot(getFollowup(tag));
-  }
-
   // ===== 렌더 =====
   return (
     <View style={{ flex: 1, backgroundColor: "#fff" }}>
@@ -332,7 +353,6 @@ export default function ChatFortuneScreen() {
         contentContainerStyle={{
           paddingTop: 12,
           paddingHorizontal: 12,
-          // 하단 바 + (키보드 떠있으면 키보드 높이만큼 더 확보)
           paddingBottom:
             barH + (kbShown ? kbHeight : Math.max(insets.bottom, 8)),
         }}
@@ -388,7 +408,7 @@ export default function ChatFortuneScreen() {
               {FOLLOWUP_CHIPS.map((ch) => (
                 <Pressable
                   key={ch.key}
-                  onPress={() => onAskFollowup(ch.key)}
+                  onPress={() => onStartFollowup(ch.key)}
                   style={{
                     paddingVertical: 8,
                     paddingHorizontal: 12,
@@ -432,14 +452,14 @@ export default function ChatFortuneScreen() {
         )}
       </ScrollView>
 
-      {/* ✅ 하단 바: absolute + 키보드 높이만큼 끌어올림(안드로이드 전용 느낌) */}
+      {/* 하단 바: absolute + 키보드 높이만큼 끌어올림 */}
       <View
         onLayout={(e) => setBarH(e.nativeEvent.layout.height)}
         style={{
           position: "absolute",
           left: 0,
           right: 0,
-          bottom: kbShown ? kbHeight : 0, // ← 키보드에 딱 붙음
+          bottom: kbShown ? kbHeight : 0,
           borderTopWidth: 1,
           borderColor: Colors.border,
           backgroundColor: "#fff",
