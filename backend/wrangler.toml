@@ -2,16 +2,38 @@ name = "fortune-backend"
 main = "src/index.js"
 compatibility_date = "2025-11-10"
 
+# -------------------------------
+# ✅ KV 네임스페이스 연결
+# -------------------------------
 [[kv_namespaces]]
 binding = "FORTUNE_KV"
-id = "34196ddf62114b31a52def9922d23fd0"      # ✅ 방금 생성된 prod id
-preview_id = "7bde5e936fd548b2ab1ce73af22c6566" # ✅ 방금 생성된 preview id
+id = "c1e52a0dd0ca4605980fca3060908509"        # production KV ID
+preview_id = "c1e52a0dd0ca4605980fca3060908509" # preview KV ID
 
+# -------------------------------
+# ✅ 환경변수 (Worker 실행 시 적용)
+# toml 내부에서는 JSON/정수 대신 문자열만 써야 함
+# -------------------------------
 [vars]
 ENV = "dev"
-DEBUG = "1"                     # toml의 vars는 문자열 권장
-GEMINI_MODEL = "gemini-1.5-flash"  # (선택) 기본 모델 고정
+DEBUG = "1"
+GEMINI_MODEL = "gemini-1.5-flash"
 
+SUPABASE_URL = "https://kcteauczfedbsxgrpdff.supabase.co"
+SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtjdGVhdWN6ZmVkYnN4Z3JwZGZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI3NjE2MDQsImV4cCI6MjA3ODMzNzYwNH0.J_VtoAnEauEPGFWUMy6XG59EzTaaP9XdwuKweOm9jks"
+SUPABASE_SERVICE_ROLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtjdGVhdWN6ZmVkYnN4Z3JwZGZmIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2Mjc2MTYwNCwiZXhwIjoyMDc4MzM3NjA0fQ.EQLbeoU2btrYFlFVISP1aBnT0cM_nv60fJxWGYtVcdA"
+
+# ✅ Gemini API Key 여러 개 순서대로
+GEMINI_API_KEY_1 = "AIzaSyCtVUbDdSd0FIIDZKZ1KRgrIrS1XisjE3Q"
+GEMINI_API_KEY_2 = "AIzaSyC5syZA0D3aq1QZSHczFQTSVV8bBQHeCSs"
+GEMINI_API_KEY_3 = "AIzaSyCCzNKTnjCLy6ifIHrKUIZrdRlu-ee3cCA"
+GEMINI_API_KEY_4 = "AIzaSyAvca1r-SMD32rBnQ8S7f6o28FN1YpxfqU"
+GEMINI_API_KEY_5 = "AIzaSyBGJskiNRNrPI1I9gJcQN6D6TH_OMoKaMI"
+GEMINI_API_KEY_6 = "AIzaSyBriEgeqI4nbrTdst0hqhKspoXd0enGYN0"
+
+# -------------------------------
+# ✅ 로컬 개발 환경
+# -------------------------------
 [dev]
 port = 8787
 local_protocol = "http"

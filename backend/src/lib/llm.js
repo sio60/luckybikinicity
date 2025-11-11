@@ -7,19 +7,30 @@ const API_VERSIONS = ["v1", "v1beta"];
 const makeEndpoint = (version, model) =>
   `https://generativelanguage.googleapis.com/${version}/models/${model}:generateContent`;
 
+// ✅ 여러 Gemini 키 자동 수집 (GEMINI_API_KEY, GEMINI_API_KEY_1~6)
+function getGeminiApiKeys(env) {
+  const entries = Object.entries(env || {});
+  const keys = entries
+    .filter(([k]) => k === "GEMINI_API_KEY" || k.startsWith("GEMINI_API_KEY_"))
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([, v]) => v)
+    .filter(Boolean);
+  return keys;
+}
+
 /**
  * category별 프롬프트 조립
  */
 function buildPrompt(payload) {
   const {
-    category = "today",           // today | name | compat | saju
+    category = "today", // today | name | compat | saju
     timezone = "Asia/Seoul",
     // 공통(1인)
     name,
-    birthdate,                    // YYYY-MM-DD
-    calendar = "solar",           // solar | lunar
-    birthTime = "unknown",        // e.g., 10:08 or "unknown"
-    gender,                       // male | female | other | unknown
+    birthdate, // YYYY-MM-DD
+    calendar = "solar", // solar | lunar
+    birthTime = "unknown", // e.g., 10:08 or "unknown"
+    gender, // male | female | other | unknown
     // 커플(2인)
     couple,
   } = payload;
@@ -35,7 +46,6 @@ function buildPrompt(payload) {
 - 존댓말을 사용하세요.
 `.trim();
 
-  // 카테고리별 안내
   if (category === "name") {
     return {
       systemPrompt,
@@ -85,7 +95,7 @@ function buildPrompt(payload) {
     };
   }
 
-  // today / saju (1인 상세)
+  // today / saju (1인)
   return {
     systemPrompt,
     userPrompt: `
@@ -109,69 +119,92 @@ function buildPrompt(payload) {
 }
 
 /**
- * Gemini 호출
+ * Gemini 호출 (6개 키 순환 폴백)
  */
 export async function generateFortuneText(env, payload) {
-  const apiKey = env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("Missing GEMINI_API_KEY in env");
+  const apiKeys = getGeminiApiKeys(env);
+  if (!apiKeys.length) throw new Error("Missing GEMINI_API_KEY(_1~_6) in env");
 
   const { systemPrompt, userPrompt } = buildPrompt(payload);
-
   const attemptTokenLimits = [300, 1024];
+
   const modelCandidates = [];
   if (env?.GEMINI_MODEL) modelCandidates.push(String(env.GEMINI_MODEL));
-  for (const m of DEFAULT_MODELS) if (!modelCandidates.includes(m)) modelCandidates.push(m);
+  for (const m of DEFAULT_MODELS)
+    if (!modelCandidates.includes(m)) modelCandidates.push(m);
 
   let lastErr = null;
 
-  for (const version of API_VERSIONS) {
-    for (const model of modelCandidates) {
-      for (const maxOutputTokens of attemptTokenLimits) {
-        const body = {
-          contents: [{ role: "user", parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }],
-          generationConfig: { temperature: 0.8, maxOutputTokens },
-        };
+  // ✅ 키 → 버전 → 모델 → 토큰 순으로 폴백
+  for (let keyIndex = 0; keyIndex < apiKeys.length; keyIndex++) {
+    const apiKey = apiKeys[keyIndex];
 
-        let res;
-        try {
-          res = await fetch(`${makeEndpoint(version, model)}?key=${apiKey}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
-          });
-        } catch (e) {
-          lastErr = new Error(`Network error (${version}/${model}): ${e.message}`);
-          continue;
+    for (const version of API_VERSIONS) {
+      for (const model of modelCandidates) {
+        for (const maxOutputTokens of attemptTokenLimits) {
+          const body = {
+            contents: [
+              {
+                role: "user",
+                parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }],
+              },
+            ],
+            generationConfig: { temperature: 0.8, maxOutputTokens },
+          };
+
+          let res;
+          try {
+            res = await fetch(`${makeEndpoint(version, model)}?key=${apiKey}`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(body),
+            });
+          } catch (e) {
+            lastErr = new Error(
+              `Network error (key#${keyIndex + 1} ${version}/${model}): ${e.message}`
+            );
+            continue;
+          }
+
+          if (res.status === 404) {
+            lastErr = new Error(
+              `404 Not Found for key#${keyIndex + 1} ${version}/${model}`
+            );
+            continue;
+          }
+
+          if (!res.ok) {
+            const txt = await res.text().catch(() => "");
+            lastErr = new Error(
+              `Gemini error (key#${keyIndex + 1} ${version}/${model}): ${res.status} ${txt}`
+            );
+            continue;
+          }
+
+          const data = await res.json();
+          const candidate = data.candidates?.[0];
+          const parts =
+            candidate?.content?.parts?.filter(p => typeof p?.text === "string") ||
+            [];
+          const text = parts.map(p => p.text || "").join("\n").trim();
+          const finishReason =
+            candidate?.finishReason || data.finishReason || "unknown";
+
+          if (text) {
+            const cleaned = text
+              .replace(/100%/g, "꽤 높은 확률로")
+              .replace(/반드시/g, "될 가능성이 커요");
+            return cleaned;
+          }
+
+          if (finishReason !== "MAX_TOKENS") break;
         }
-
-        if (res.status === 404) { // 모델/버전 미지원
-          lastErr = new Error(`404 Not Found for ${version}/${model}`);
-          continue;
-        }
-
-        if (!res.ok) {
-          const txt = await res.text().catch(() => "");
-          lastErr = new Error(`Gemini error (${version}/${model}): ${res.status} ${txt}`);
-          continue;
-        }
-
-        const data = await res.json();
-        const candidate = data.candidates?.[0];
-        const parts = candidate?.content?.parts?.filter(p => typeof p?.text === "string") || [];
-        const text = parts.map(p => p.text || "").join("\n").trim();
-        const finishReason = candidate?.finishReason || data.finishReason || "unknown";
-
-        if (text) {
-          return text
-            .replace(/100%/g, "꽤 높은 확률로")
-            .replace(/반드시/g, "될 가능성이 커요");
-        }
-        if (finishReason !== "MAX_TOKENS") break;
       }
     }
   }
 
-  if (env?.DEBUG && lastErr) console.warn("Gemini fallback:", lastErr.message);
+  if (env?.DEBUG && lastErr)
+    console.warn("Gemini fallback used due to:", lastErr.message);
 
   return `오늘은 결과보다 과정에 집중해 보시면 좋아요.
 가벼운 산책이나 따뜻한 차처럼 몸과 마음을 풀어주는 작은 휴식을 챙겨 보세요.`;
