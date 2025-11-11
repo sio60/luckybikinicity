@@ -1,9 +1,11 @@
 // src/lib/llm.js
 
-// 모델 후보(빠름→정확)
-const DEFAULT_MODELS = ["gemini-1.5-flash", "gemini-1.5-pro"];
-// API 버전 후보
-const API_VERSIONS = ["v1", "v1beta"];
+// ✅ 기본 모델 후보 (빠름 → 정확)
+const DEFAULT_MODELS = ["gemini-2.5-flash", "gemini-2.5-pro"];
+
+// ✅ API 버전: v1만 사용 (v1beta는 404 많이 남)
+const API_VERSIONS = ["v1"];
+
 const makeEndpoint = (version, model) =>
   `https://generativelanguage.googleapis.com/${version}/models/${model}:generateContent`;
 
@@ -11,7 +13,9 @@ const makeEndpoint = (version, model) =>
 function getGeminiApiKeys(env) {
   const entries = Object.entries(env || {});
   const keys = entries
-    .filter(([k]) => k === "GEMINI_API_KEY" || k.startsWith("GEMINI_API_KEY_"))
+    .filter(
+      ([k]) => k === "GEMINI_API_KEY" || k.startsWith("GEMINI_API_KEY_")
+    )
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([, v]) => v)
     .filter(Boolean);
@@ -33,7 +37,7 @@ function buildPrompt(payload) {
     gender, // male | female | other | unknown
     // 커플(2인)
     couple,
-  } = payload;
+  } = payload || {};
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -119,19 +123,35 @@ function buildPrompt(payload) {
 }
 
 /**
- * Gemini 호출 (6개 키 순환 폴백)
+ * Gemini 호출 (여러 키 × 여러 모델 폴백)
  */
 export async function generateFortuneText(env, payload) {
   const apiKeys = getGeminiApiKeys(env);
-  if (!apiKeys.length) throw new Error("Missing GEMINI_API_KEY(_1~_6) in env");
+
+  if (!apiKeys.length) {
+    console.error("[GEMINI] No API keys found in env (GEMINI_API_KEY(_1~_6))");
+    return `오늘은 결과보다 과정에 집중해 보시면 좋아요.
+가벼운 산책이나 따뜻한 차처럼 몸과 마음을 풀어주는 작은 휴식을 챙겨 보세요.`;
+  }
 
   const { systemPrompt, userPrompt } = buildPrompt(payload);
-  const attemptTokenLimits = [300, 1024];
+
+  // 디버그용 토큰 설정 (필요하면 배열 늘려도 됨)
+  const attemptTokenLimits = [512];
 
   const modelCandidates = [];
   if (env?.GEMINI_MODEL) modelCandidates.push(String(env.GEMINI_MODEL));
-  for (const m of DEFAULT_MODELS)
+  for (const m of DEFAULT_MODELS) {
     if (!modelCandidates.includes(m)) modelCandidates.push(m);
+  }
+
+  if (env?.DEBUG) {
+    console.log("[GEMINI] Config:", {
+      API_VERSIONS,
+      modelCandidates,
+      hasKeys: apiKeys.length,
+    });
+  }
 
   let lastErr = null;
 
@@ -152,60 +172,130 @@ export async function generateFortuneText(env, payload) {
             generationConfig: { temperature: 0.8, maxOutputTokens },
           };
 
+          if (env?.DEBUG) {
+            console.log(
+              `[GEMINI] Try key#${keyIndex + 1}, version=${version}, model=${model}, maxTokens=${maxOutputTokens}`
+            );
+          }
+
           let res;
           try {
-            res = await fetch(`${makeEndpoint(version, model)}?key=${apiKey}`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(body),
-            });
+            res = await fetch(
+              `${makeEndpoint(version, model)}?key=${apiKey}`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+              }
+            );
           } catch (e) {
+            console.error(
+              `[GEMINI] Network error (key#${keyIndex + 1} ${version}/${model}):`,
+              e.message
+            );
             lastErr = new Error(
               `Network error (key#${keyIndex + 1} ${version}/${model}): ${e.message}`
             );
             continue;
           }
 
+          if (env?.DEBUG) {
+            console.log(
+              `[GEMINI] Response status (key#${keyIndex + 1} ${version}/${model}):`,
+              res.status
+            );
+          }
+
+          // 404: 모델/버전 미지원 → body는 한 번 읽고 버림 (stalled 방지)
           if (res.status === 404) {
+            const txt = await res.text().catch(() => "");
+            console.error(
+              `[GEMINI] 404 Not Found (key#${keyIndex + 1} ${version}/${model}), body:`,
+              txt.slice(0, 300)
+            );
             lastErr = new Error(
               `404 Not Found for key#${keyIndex + 1} ${version}/${model}`
             );
             continue;
           }
 
+          // 그 외 비정상 응답
           if (!res.ok) {
             const txt = await res.text().catch(() => "");
+            console.error(
+              `[GEMINI] Non-OK response (key#${keyIndex + 1} ${version}/${model}) status=${res.status}, body=`,
+              txt.slice(0, 300)
+            );
             lastErr = new Error(
-              `Gemini error (key#${keyIndex + 1} ${version}/${model}): ${res.status} ${txt}`
+              `Gemini error (key#${keyIndex + 1} ${version}/${model}): ${res.status}`
             );
             continue;
           }
 
-          const data = await res.json();
+          // ✅ 200대: JSON 파싱
+          const data = await res.json().catch(e => {
+            console.error("[GEMINI] JSON parse error:", e.message);
+            lastErr = new Error(`JSON parse error: ${e.message}`);
+            return null;
+          });
+
+          if (!data) continue;
+
+          if (env?.DEBUG) {
+            try {
+              console.log(
+                "[GEMINI] Raw candidate[0]:",
+                JSON.stringify(data.candidates?.[0] || {}, null, 2).slice(
+                  0,
+                  500
+                )
+              );
+            } catch (_) {
+              // JSON stringify 실패는 무시
+            }
+          }
+
           const candidate = data.candidates?.[0];
           const parts =
-            candidate?.content?.parts?.filter(p => typeof p?.text === "string") ||
-            [];
+            candidate?.content?.parts?.filter(
+              p => typeof p?.text === "string"
+            ) || [];
           const text = parts.map(p => p.text || "").join("\n").trim();
           const finishReason =
             candidate?.finishReason || data.finishReason || "unknown";
 
+          if (env?.DEBUG) {
+            console.log(
+              "[GEMINI] Parsed text length:",
+              text.length,
+              "finishReason:",
+              finishReason
+            );
+          }
+
           if (text) {
+            // 너무 단정적인 표현만 약간 순화
             const cleaned = text
               .replace(/100%/g, "꽤 높은 확률로")
               .replace(/반드시/g, "될 가능성이 커요");
             return cleaned;
           }
 
-          if (finishReason !== "MAX_TOKENS") break;
+          console.warn(
+            "[GEMINI] Empty text from Gemini. finishReason=",
+            finishReason
+          );
+          // 여기서는 다음 모델/키로 넘어감
         }
       }
     }
   }
 
-  if (env?.DEBUG && lastErr)
+  if (env?.DEBUG && lastErr) {
     console.warn("Gemini fallback used due to:", lastErr.message);
+  }
 
+  // ✅ 최종 폴백 문구
   return `오늘은 결과보다 과정에 집중해 보시면 좋아요.
 가벼운 산책이나 따뜻한 차처럼 몸과 마음을 풀어주는 작은 휴식을 챙겨 보세요.`;
 }

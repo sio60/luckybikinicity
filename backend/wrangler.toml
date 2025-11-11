@@ -17,7 +17,8 @@ preview_id = "c1e52a0dd0ca4605980fca3060908509" # preview KV ID
 [vars]
 ENV = "dev"
 DEBUG = "1"
-GEMINI_MODEL = "gemini-1.5-flash"
+GEMINI_MODEL = "gemini-2.5-flash"
+
 
 SUPABASE_URL = "https://kcteauczfedbsxgrpdff.supabase.co"
 SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtjdGVhdWN6ZmVkYnN4Z3JwZGZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI3NjE2MDQsImV4cCI6MjA3ODMzNzYwNH0.J_VtoAnEauEPGFWUMy6XG59EzTaaP9XdwuKweOm9jks"
