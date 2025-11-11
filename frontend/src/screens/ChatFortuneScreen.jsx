@@ -16,7 +16,7 @@ import Logo from "../components/Logo";
 import { api } from "../lib/api";
 
 const CATEGORIES = ["오늘의 운세", "이름으로 보는 나는?", "커플 궁합", "사주"];
-const DEVICE_ID = `${Platform.OS}-local-dev`;
+const DEVICE_ID = `${Platform.OS}-local-dev-${Math.floor(Date.now() / 1000)}-${Math.floor(Math.random() * 1000)}`;
 const DEFAULT_TIMEZONE = "Asia/Seoul";
 
 // ✅ 한국어 라벨 → 백엔드 category 값 매핑

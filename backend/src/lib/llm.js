@@ -1,10 +1,18 @@
 // src/lib/llm.js
 
 // ✅ 기본 모델 후보 (빠름 → 정확)
-const DEFAULT_MODELS = ["gemini-2.5-flash", "gemini-2.5-pro"];
+const DEFAULT_MODELS = [
+  "gemini-2.5-flash",
+  "gemini-2.5-pro",
+  "gemini-flash-latest",
+  "gemini-pro-latest",
+  "gemini-2.5-flash-preview-05-20",
+  "gemini-2.5-pro-preview-06-05",
+  "gemini-2.0-flash",
+];
 
-// ✅ API 버전: v1만 사용 (v1beta는 404 많이 남)
-const API_VERSIONS = ["v1"];
+// ✅ API 버전 폴백: v1 → v1beta (신규 모델 다수는 v1beta에 먼저 노출됨)
+const API_VERSIONS = ["v1", "v1beta"];
 
 const makeEndpoint = (version, model) =>
   `https://generativelanguage.googleapis.com/${version}/models/${model}:generateContent`;
@@ -125,6 +133,9 @@ function buildPrompt(payload) {
 /**
  * Gemini 호출 (여러 키 × 여러 모델 폴백)
  */
+export const FALLBACK_FORTUNE_TEXT = `오늘은 결과보다 과정에 집중해 보시면 좋아요.
+가벼운 산책이나 따뜻한 차처럼 몸과 마음을 풀어주는 작은 휴식을 챙겨 보세요.`;
+
 export async function generateFortuneText(env, payload) {
   // ✅ 호출 여부 + env 안에 뭐 들어왔는지 확인
   console.log("=== [LLM] generateFortuneText called ===");
@@ -193,7 +204,11 @@ export async function generateFortuneText(env, payload) {
           );
 
           if (res.status === 404) {
-            await res.text().catch(() => {});
+            const txt = await res.text().catch(() => "");
+            console.warn(
+              `[LLM] 404 body (key#${keyIndex + 1} ${version}/${model}):`,
+              txt
+            );
             lastErr = new Error(
               `404 Not Found for key#${keyIndex + 1} ${version}/${model}`
             );
@@ -232,7 +247,7 @@ export async function generateFortuneText(env, payload) {
             const cleaned = text
               .replace(/100%/g, "꽤 높은 확률로")
               .replace(/반드시/g, "될 가능성이 커요");
-            return cleaned;
+            return { text: cleaned, usedFallback: false };
           }
 
           if (finishReason !== "MAX_TOKENS") break;
@@ -244,7 +259,10 @@ export async function generateFortuneText(env, payload) {
   if (env?.DEBUG && lastErr)
     console.warn("Gemini fallback used due to:", lastErr.message);
 
-  return `오늘은 결과보다 과정에 집중해 보시면 좋아요.
-가벼운 산책이나 따뜻한 차처럼 몸과 마음을 풀어주는 작은 휴식을 챙겨 보세요.`;
+  return {
+    text: FALLBACK_FORTUNE_TEXT,
+    usedFallback: true,
+    lastError: lastErr,
+  };
 }
 
