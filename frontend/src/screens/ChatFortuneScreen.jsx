@@ -16,6 +16,7 @@ import { useDeviceId } from "../hooks/useDeviceId";
 import { getLocalFortune } from "../lib/localFortune";
 import { calendarLabel, normGender, todayYMD } from "../lib/personalize";
 import { getJSON, setJSON } from "../lib/store";
+import AdBanner from "../components/AdBanner";
 
 // ===== 설정 =====
 const CATEGORIES = ["오늘의 운세", "이름으로 보는 나는?", "커플 궁합", "사주"];
@@ -343,208 +344,214 @@ export default function ChatFortuneScreen() {
 
   // ===== 렌더 =====
   return (
-    <View style={{ flex: 1, backgroundColor: "#fff" }}>
-      <ScrollView
-        ref={scrollRef}
-        keyboardShouldPersistTaps="handled"
-        onContentSizeChange={() =>
-          scrollRef.current?.scrollToEnd({ animated: true })
-        }
-        contentContainerStyle={{
-          paddingTop: 12,
-          paddingHorizontal: 12,
-          paddingBottom:
-            barH + (kbShown ? kbHeight : Math.max(insets.bottom, 8)),
-        }}
-      >
-        {messages.map((m) => {
-          const isMe = m.who === "me";
-          return (
-            <View
-              key={m.id}
-              style={{
-                flexDirection: "row",
-                justifyContent: isMe ? "flex-end" : "flex-start",
-                marginBottom: 10,
-              }}
-            >
-              {!isMe && (
-                <View
-                  style={{
-                    width: 28,
-                    height: 28,
-                    marginRight: 8,
-                    marginTop: 2,
-                  }}
-                >
-                  <Logo size={28} />
-                </View>
-              )}
+  <View style={{ flex: 1, backgroundColor: "#fff" }}>
+    <ScrollView
+      ref={scrollRef}
+      keyboardShouldPersistTaps="handled"
+      onContentSizeChange={() =>
+        scrollRef.current?.scrollToEnd({ animated: true })
+      }
+      contentContainerStyle={{
+        paddingTop: 12,
+        paddingHorizontal: 12,
+        paddingBottom:
+          barH + (kbShown ? kbHeight : Math.max(insets.bottom, 8)),
+      }}
+    >
+      {messages.map((m) => {
+        const isMe = m.who === "me";
+        return (
+          <View
+            key={m.id}
+            style={{
+              flexDirection: "row",
+              justifyContent: isMe ? "flex-end" : "flex-start",
+              marginBottom: 10,
+            }}
+          >
+            {!isMe && (
               <View
                 style={{
-                  maxWidth: "78%",
-                  backgroundColor: isMe ? Colors.primary : "#eee6ff",
-                  paddingHorizontal: 14,
-                  paddingVertical: 10,
-                  borderRadius: 14,
+                  width: 28,
+                  height: 28,
+                  marginRight: 8,
+                  marginTop: 2,
                 }}
               >
-                <Text style={{ color: isMe ? "#fff" : "#333", lineHeight: 20 }}>
-                  {m.text}
-                </Text>
+                <Logo size={28} />
               </View>
+            )}
+            <View
+              style={{
+                maxWidth: "78%",
+                backgroundColor: isMe ? Colors.primary : "#eee6ff",
+                paddingHorizontal: 14,
+                paddingVertical: 10,
+                borderRadius: 14,
+              }}
+            >
+              <Text style={{ color: isMe ? "#fff" : "#333", lineHeight: 20 }}>
+                {m.text}
+              </Text>
             </View>
-          );
-        })}
-
-        {showFollowups && (
-          <View style={{ marginTop: 4, gap: 10 }}>
-            <Text style={{ color: "#666", marginLeft: 4 }}>다른 질문하기</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: 8 }}
-            >
-              {FOLLOWUP_CHIPS.map((ch) => (
-                <Pressable
-                  key={ch.key}
-                  onPress={() => onStartFollowup(ch.key)}
-                  style={{
-                    paddingVertical: 8,
-                    paddingHorizontal: 12,
-                    borderRadius: 999,
-                    backgroundColor: "#f3f0ff",
-                  }}
-                >
-                  <Text style={{ color: Colors.primary, fontWeight: "700" }}>
-                    {ch.label}
-                  </Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-
-            <Text style={{ color: "#666", marginLeft: 4, marginTop: 6 }}>
-              카테고리 바꾸기
-            </Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: 8 }}
-            >
-              {QUICK_CATEGORY_CHIPS.map((ch) => (
-                <Pressable
-                  key={ch.label}
-                  onPress={() => onPick(ch.label)}
-                  style={{
-                    paddingVertical: 8,
-                    paddingHorizontal: 12,
-                    borderRadius: 999,
-                    backgroundColor: "#f3f0ff",
-                  }}
-                >
-                  <Text style={{ color: Colors.primary, fontWeight: "700" }}>
-                    {ch.label}
-                  </Text>
-                </Pressable>
-              ))}
-            </ScrollView>
           </View>
-        )}
-      </ScrollView>
+        );
+      })}
 
-      {/* 하단 바: absolute + 키보드 높이만큼 끌어올림 */}
-      <View
-        onLayout={(e) => setBarH(e.nativeEvent.layout.height)}
-        style={{
-          position: "absolute",
-          left: 0,
-          right: 0,
-          bottom: kbShown ? kbHeight : 0,
-          borderTopWidth: 1,
-          borderColor: Colors.border,
-          backgroundColor: "#fff",
-        }}
-      >
-        {!category && (
+      {showFollowups && (
+        <View style={{ marginTop: 4, gap: 10 }}>
+          <Text style={{ color: "#666", marginLeft: 4 }}>다른 질문하기</Text>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{
-              paddingHorizontal: 12,
-              paddingTop: 8,
-              paddingBottom: 8,
-              gap: 8,
-            }}
+            contentContainerStyle={{ gap: 8 }}
           >
-            {CATEGORIES.map((c) => (
+            {FOLLOWUP_CHIPS.map((ch) => (
               <Pressable
-                key={c}
-                onPress={() => onPick(c)}
+                key={ch.key}
+                onPress={() => onStartFollowup(ch.key)}
                 style={{
-                  paddingVertical: 10,
-                  paddingHorizontal: 16,
+                  paddingVertical: 8,
+                  paddingHorizontal: 12,
                   borderRadius: 999,
                   backgroundColor: "#f3f0ff",
                 }}
               >
                 <Text style={{ color: Colors.primary, fontWeight: "700" }}>
-                  {c}
+                  {ch.label}
                 </Text>
               </Pressable>
             ))}
           </ScrollView>
-        )}
 
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
+          <Text style={{ color: "#666", marginLeft: 4, marginTop: 6 }}>
+            카테고리 바꾸기
+          </Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 8 }}
+          >
+            {QUICK_CATEGORY_CHIPS.map((ch) => (
+              <Pressable
+                key={ch.label}
+                onPress={() => onPick(ch.label)}
+                style={{
+                  paddingVertical: 8,
+                  paddingHorizontal: 12,
+                  borderRadius: 999,
+                  backgroundColor: "#f3f0ff",
+                }}
+              >
+                <Text style={{ color: Colors.primary, fontWeight: "700" }}>
+                  {ch.label}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+    </ScrollView>
+
+    {/* 하단 바: absolute + 키보드 높이만큼 끌어올림 */}
+    <View
+      onLayout={(e) => setBarH(e.nativeEvent.layout.height)}
+      style={{
+        position: "absolute",
+        left: 0,
+        right: 0,
+        bottom: kbShown ? kbHeight : 0,
+        borderTopWidth: 1,
+        borderColor: Colors.border,
+        backgroundColor: "#fff",
+      }}
+    >
+      {/* 카테고리 선택 칩 */}
+      {!category && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{
             paddingHorizontal: 12,
             paddingTop: 8,
-            paddingBottom: Math.max(insets.bottom, 8),
-            gap: 10,
+            paddingBottom: 8,
+            gap: 8,
           }}
         >
-          <TextInput
-            placeholder={
-              category
-                ? "메시지를 입력하세요"
-                : "아래 칩에서 카테고리를 선택해 주세요"
-            }
-            value={text}
-            onChangeText={setText}
-            editable={!!category && !loading}
-            style={{
-              flex: 1,
-              height: 44,
-              borderWidth: 1,
-              borderColor: Colors.border,
-              borderRadius: 12,
-              paddingHorizontal: 14,
-              backgroundColor: "#fff",
-            }}
-          />
-          <Pressable
-            onPress={onSend}
-            disabled={!text.trim() || !category || loading}
-            style={{
-              height: 44,
-              paddingHorizontal: 16,
-              borderRadius: 12,
-              alignItems: "center",
-              justifyContent: "center",
-              backgroundColor:
-                !text.trim() || !category || loading
-                  ? "#cfcaf8"
-                  : Colors.primary,
-            }}
-          >
-            <Text style={{ color: "#fff", fontWeight: "700" }}>
-              {loading ? "..." : "보내기"}
-            </Text>
-          </Pressable>
-        </View>
+          {CATEGORIES.map((c) => (
+            <Pressable
+              key={c}
+              onPress={() => onPick(c)}
+              style={{
+                paddingVertical: 10,
+                paddingHorizontal: 16,
+                borderRadius: 999,
+                backgroundColor: "#f3f0ff",
+              }}
+            >
+              <Text style={{ color: Colors.primary, fontWeight: "700" }}>
+                {c}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      )}
+
+      {/* ✅ 배너 광고: 입력창 바로 위 */}
+      <AdBanner />
+
+      {/* 입력창 / 보내기 버튼 */}
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          paddingHorizontal: 12,
+          paddingTop: 8,
+          paddingBottom: Math.max(insets.bottom, 8),
+          gap: 10,
+        }}
+      >
+        <TextInput
+          placeholder={
+            category
+              ? "메시지를 입력하세요"
+              : "아래 칩에서 카테고리를 선택해 주세요"
+          }
+          value={text}
+          onChangeText={setText}
+          editable={!!category && !loading}
+          style={{
+            flex: 1,
+            height: 44,
+            borderWidth: 1,
+            borderColor: Colors.border,
+            borderRadius: 12,
+            paddingHorizontal: 14,
+            backgroundColor: "#fff",
+          }}
+        />
+        <Pressable
+          onPress={onSend}
+          disabled={!text.trim() || !category || loading}
+          style={{
+            height: 44,
+            paddingHorizontal: 16,
+            borderRadius: 12,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor:
+              !text.trim() || !category || loading
+                ? "#cfcaf8"
+                : Colors.primary,
+          }}
+        >
+          <Text style={{ color: "#fff", fontWeight: "700" }}>
+            {loading ? "..." : "보내기"}
+          </Text>
+        </Pressable>
       </View>
     </View>
-  );
+  </View>
+);
+
 }
