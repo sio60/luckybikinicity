@@ -5,9 +5,17 @@ import { generateFortuneText } from "../lib/llm.js";
 
 export async function handleFortuneToday(request, env, ctx) {
   const body = await parseJson(request);
-  const { birthdate, name, timezone, category } = body;
+  let { birthdate, name, timezone, category } = body || {};
 
-  if (!birthdate) {
+  // ✅ 카테고리 기본값 + 정규화
+  const normalizedCategory = category || "today";
+  timezone = timezone || "Asia/Seoul";
+
+  // ✅ today / saju 만 생년월일 필수
+  if (
+    !birthdate &&
+    (normalizedCategory === "today" || normalizedCategory === "saju")
+  ) {
     return new Response(
       JSON.stringify({ message: "birthdate is required" }),
       {
@@ -20,8 +28,7 @@ export async function handleFortuneToday(request, env, ctx) {
   const deviceId = request.headers.get("x-device-id") || "anon";
   const todayKey = new Date().toISOString().slice(0, 10);
 
-  // v2 캐시 프리픽스
-  const cacheKey = `fortune:v2:${deviceId}:${todayKey}:${category || "all"}`;
+  const cacheKey = `fortune:v2:${deviceId}:${todayKey}:${normalizedCategory}`;
 
   const cached = await getFortuneFromCache(env, cacheKey);
   if (cached) {
@@ -38,11 +45,12 @@ export async function handleFortuneToday(request, env, ctx) {
   let errorMessage;
 
   try {
+    // ✅ llm.js에는 정규화된 카테고리, timezone 같이 넘김
     fortuneText = await generateFortuneText(env, {
       birthdate,
       name,
       timezone,
-      category,
+      category: normalizedCategory,
     });
   } catch (e) {
     console.error("Gemini error:", e);
@@ -57,7 +65,7 @@ export async function handleFortuneToday(request, env, ctx) {
     birthdate,
     name,
     timezone,
-    category,
+    category: normalizedCategory,
     fortune: fortuneText,
     promptVersion: "v2-gemini",
   };
@@ -67,7 +75,6 @@ export async function handleFortuneToday(request, env, ctx) {
   }
 
   const result = JSON.stringify(resultObj);
-
   ctx.waitUntil(setFortuneToCache(env, cacheKey, result, 86400));
 
   return new Response(result, {
