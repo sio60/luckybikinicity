@@ -16,26 +16,22 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.yunokio.frontend",
+      "windowSoftInputMode": "adjustResize",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.yunokio.frontend"
+      "softwareKeyboardLayoutMode": "resize"
     },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    },
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
+    "web": { "favicon": "./assets/favicon.png" },
+    "runtimeVersion": { "policy": "appVersion" },
     "updates": {
       "url": "https://u.expo.dev/5aa4a8fd-07f6-4b64-9129-82797b9243d7"
     },
     "extra": {
-      "eas": {
-        "projectId": "5aa4a8fd-07f6-4b64-9129-82797b9243d7"
-      }
+      "eas": { "projectId": "5aa4a8fd-07f6-4b64-9129-82797b9243d7" }
     }
   }
 }

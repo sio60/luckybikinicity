@@ -12,12 +12,12 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useFonts } from "expo-font";
 
 import HomeScreen from "./src/screens/HomeScreen";
-import FortuneScreen from "./src/screens/FortuneScreen";
+// ⬇️ 채팅형 화면으로 교체
+import ChatFortuneScreen from "./src/screens/ChatFortuneScreen";
 import { Colors } from "./src/theme/colors";
 
 const Stack = createNativeStackNavigator();
 
-// ✅ Paper 테마 (MD3 + 폰트 키 지정)
 const paperTheme = {
   ...MD3LightTheme,
   colors: { ...MD3LightTheme.colors, primary: Colors.primary },
@@ -29,7 +29,6 @@ const paperTheme = {
   },
 };
 
-// ✅ Navigation 테마
 const navTheme = {
   ...NavDefaultTheme,
   dark: false,
@@ -52,7 +51,6 @@ export default function App() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <PaperProvider theme={paperTheme}>
         <SafeAreaProvider>
-          {/* 안드로이드에서 헤더 색과 맞춤 */}
           <StatusBar
             barStyle="light-content"
             backgroundColor={
@@ -75,8 +73,8 @@ export default function App() {
               />
               <Stack.Screen
                 name="Fortune"
-                component={FortuneScreen}
-                options={{ title: "오늘의 운세" }}
+                component={ChatFortuneScreen} // ⬅️ 여기!
+                options={{ title: "LuckyBikiniCity" }}
               />
             </Stack.Navigator>
           </NavigationContainer>
