@@ -76,7 +76,7 @@ export default function App() {
               <Stack.Screen
                 name="Fortune"
                 component={FortuneScreen}
-                options={{ title: "오늘의 운세" }}
+                options={{ title: "LuckyBikiniCity" }}
               />
             </Stack.Navigator>
           </NavigationContainer>

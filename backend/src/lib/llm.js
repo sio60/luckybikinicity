@@ -1,50 +1,123 @@
 // src/lib/llm.js
 
-// 후보 모델 (빠른→정확)
+// 모델 후보(빠름→정확)
 const DEFAULT_MODELS = ["gemini-1.5-flash", "gemini-1.5-pro"];
-
-// 후보 API 버전 (키/계정 상태에 따라 v1beta만 되는 경우가 있어 폴백)
+// API 버전 후보
 const API_VERSIONS = ["v1", "v1beta"];
-
 const makeEndpoint = (version, model) =>
   `https://generativelanguage.googleapis.com/${version}/models/${model}:generateContent`;
 
 /**
- * 운세 텍스트 생성 (Gemini 호출)
+ * category별 프롬프트 조립
  */
-export async function generateFortuneText(env, { birthdate, name, timezone, category }) {
-  const apiKey = env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("Missing GEMINI_API_KEY in env");
+function buildPrompt(payload) {
+  const {
+    category = "today",           // today | name | compat | saju
+    timezone = "Asia/Seoul",
+    // 공통(1인)
+    name,
+    birthdate,                    // YYYY-MM-DD
+    calendar = "solar",           // solar | lunar
+    birthTime = "unknown",        // e.g., 10:08 or "unknown"
+    gender,                       // male | female | other | unknown
+    // 커플(2인)
+    couple,
+  } = payload;
 
   const today = new Date().toISOString().slice(0, 10);
-  const categoryLabel = category || "general";
 
   const systemPrompt = `
 당신은 한국어로 대답하는 친절한 운세 상담가입니다.
-- 너무 길게 말하지 말고, 3~5문장 정도로 간단하고 밝게 말하세요.
-- 의료, 법률, 투자에 대한 구체적인 조언이나 보장은 하지 마세요.
-- "반드시", "100%" 같은 단정적인 표현은 피하고, "도움이 될 수 있어요" 같은 완곡한 표현을 사용하세요.
-- 사용자의 불안감을 키우는 공포 마케팅을 하지 마세요.
-- 대신 오늘 하루를 긍정적으로 보낼 수 있는 작은 행동 팁을 1~2개 정도 제안하세요.
+- 3~5문장 정도로 간단하고 밝게 말하세요.
+- 의료/법률/투자에 대한 구체 보장은 피하고, "도움이 될 수 있어요" 같은 완곡한 표현을 쓰세요.
+- 공포 마케팅 금지.
+- 마지막에 오늘 실천 팁 1~2개를 덧붙이세요.
+- 존댓말을 사용하세요.
 `.trim();
 
-  const userPrompt = `
+  // 카테고리별 안내
+  if (category === "name") {
+    return {
+      systemPrompt,
+      userPrompt: `
 오늘 날짜: ${today}
-사용자 생년월일: ${birthdate}
-이름(또는 닉네임): ${name || "이름 비공개"}
-시간대: ${timezone || "Asia/Seoul (추정)"}
-운세 카테고리: ${categoryLabel}
+시간대: ${timezone}
+카테고리: 이름으로 보는 나는?
 
-위 정보를 참고해서 오늘의 운세를 자연스러운 한국어로 작성해 주세요.
-- 전체적인 하루 기운을 한두 문장으로 설명하고,
-- 선택한 카테고리(${categoryLabel})와 관련된 포인트를 한두 문장 추가하고,
-- 마지막에는 오늘 실천해보면 좋은 간단한 행동 팁 1~2개를 제안해 주세요.
-- 말투는 부드럽고 친구 같은 느낌으로, 반말은 쓰지 말고 존댓말로 말해주세요.
-`.trim();
+이름: ${name || "이름 비공개"}
+
+요청:
+- 이름의 어감/운세적 상징을 중심으로 성향/강점/주의점 요약
+- 오늘 하루에 어울리는 짧은 행동 팁 1~2개
+`.trim(),
+    };
+  }
+
+  if (category === "compat") {
+    const a = couple?.a || {};
+    const b = couple?.b || {};
+    return {
+      systemPrompt,
+      userPrompt: `
+오늘 날짜: ${today}
+시간대: ${timezone}
+카테고리: 커플 궁합
+
+[사람 A]
+이름: ${a.name || "비공개"}
+생년월일: ${a.birthdate || "모름"}
+달력: ${a.calendar || "solar"}
+출생시: ${a.birthTime || "unknown"}
+성별: ${a.gender || "unknown"}
+
+[사람 B]
+이름: ${b.name || "비공개"}
+생년월일: ${b.birthdate || "모름"}
+달력: ${b.calendar || "solar"}
+출생시: ${b.birthTime || "unknown"}
+성별: ${b.gender || "unknown"}
+
+요청:
+- 두 사람의 기본 성향 궁합 요약(동성/이성 여부 가정 없이 중립)
+- 오늘 데이트/대화 팁 1~2개
+- 단정적 예언/보장 금지
+`.trim(),
+    };
+  }
+
+  // today / saju (1인 상세)
+  return {
+    systemPrompt,
+    userPrompt: `
+오늘 날짜: ${today}
+시간대: ${timezone}
+카테고리: ${category === "saju" ? "사주" : "오늘의 운세"}
+
+이름: ${name || "비공개"}
+생년월일: ${birthdate || "모름"}
+달력: ${calendar}
+출생시: ${birthTime || "unknown"}
+성별: ${gender || "unknown"}
+
+요청:
+- 전체적인 하루 기운 요약
+- 선택 카테고리 포인트(사주면 사주 관점도 언급 가능)
+- 오늘 실천 팁 1~2개
+- 단정적 표현 금지
+`.trim(),
+  };
+}
+
+/**
+ * Gemini 호출
+ */
+export async function generateFortuneText(env, payload) {
+  const apiKey = env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("Missing GEMINI_API_KEY in env");
+
+  const { systemPrompt, userPrompt } = buildPrompt(payload);
 
   const attemptTokenLimits = [300, 1024];
-
-  // env.GEMINI_MODEL 우선, 없으면 기본 후보
   const modelCandidates = [];
   if (env?.GEMINI_MODEL) modelCandidates.push(String(env.GEMINI_MODEL));
   for (const m of DEFAULT_MODELS) if (!modelCandidates.includes(m)) modelCandidates.push(m);
@@ -68,11 +141,10 @@ export async function generateFortuneText(env, { birthdate, name, timezone, cate
           });
         } catch (e) {
           lastErr = new Error(`Network error (${version}/${model}): ${e.message}`);
-          continue; // 다음 후보
+          continue;
         }
 
-        // 404 → 모델/버전 미지원. 다음 조합 시도
-        if (res.status === 404) {
+        if (res.status === 404) { // 모델/버전 미지원
           lastErr = new Error(`404 Not Found for ${version}/${model}`);
           continue;
         }
@@ -80,7 +152,6 @@ export async function generateFortuneText(env, { birthdate, name, timezone, cate
         if (!res.ok) {
           const txt = await res.text().catch(() => "");
           lastErr = new Error(`Gemini error (${version}/${model}): ${res.status} ${txt}`);
-          // 4xx/5xx는 다음 조합 시도
           continue;
         }
 
@@ -100,11 +171,8 @@ export async function generateFortuneText(env, { birthdate, name, timezone, cate
     }
   }
 
-  if (env?.DEBUG && lastErr) {
-    console.warn("Gemini fallback used due to:", lastErr.message);
-  }
+  if (env?.DEBUG && lastErr) console.warn("Gemini fallback:", lastErr.message);
 
-  // 최종 폴백 복구문
-  return `오늘 하루는 너무 결과에 집착하기보다, 스스로를 돌보는 데 조금 더 신경 써보면 좋을 것 같아요.
-가벼운 산책이나 스트레칭, 따뜻한 차 한 잔처럼 몸과 마음을 풀어줄 수 있는 작은 휴식을 꼭 챙겨보세요.`;
+  return `오늘은 결과보다 과정에 집중해 보시면 좋아요.
+가벼운 산책이나 따뜻한 차처럼 몸과 마음을 풀어주는 작은 휴식을 챙겨 보세요.`;
 }

@@ -6,7 +6,7 @@ const ENV_BASE = (process.env.EXPO_PUBLIC_API_BASE || "").replace(/\/$/, "");
 
 // 2) 플랫폼별 합리적 기본값 (에뮬/실기기)
 const DEFAULT_BASE = Platform.select({
-  android: "http://10.100.0.108:8787", // ← PC 로컬 IP로 수정 가능
+  android: "http://10.0.2.2:8787", // ← PC 로컬 IP로 수정 가능
   ios: "http://127.0.0.1:8787",
   default: "http://10.100.0.108:8787",
 });
