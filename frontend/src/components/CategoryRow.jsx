@@ -1,42 +1,47 @@
-// src/components/CategoryRow.jsx
 import React from "react";
-import { View, Pressable, Text } from "react-native";
+import { ScrollView, Pressable, Text, View } from "react-native";
 import { Colors } from "../theme/colors";
 
-const LABELS = {
-  today: "오늘의 운세",
-  name: "이름으로 보는 나는?",
-  compat: "커플 궁합",
-  saju: "사주",
-};
+const CATS = [
+  { key: "today", label: "오늘의 운세" },
+  { key: "name", label: "이름으로 보는 나는?" },
+  { key: "compat", label: "커플 궁합" },
+  { key: "saju", label: "사주" },
+];
 
-export default function CategoryRow({ value, onChange }) {
-  const items = ["today", "name", "compat", "saju"];
+export default function CategoryRow({ value, onChange, cats = CATS }) {
   return (
-    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-      {items.map((k) => {
-        const sel = value === k;
-        return (
-          <Pressable
-            key={k}
-            onPress={() => onChange(k)}
-            style={{
-              paddingVertical: 8,
-              paddingHorizontal: 12,
-              borderRadius: 999,
-              backgroundColor: sel ? Colors.primary : "#f5f5fb",
-              borderWidth: 1,
-              borderColor: sel ? Colors.primary : "#e9e9ee",
-            }}
-          >
-            <Text
-              style={{ color: sel ? "#fff" : "#5c5c70", fontWeight: "700" }}
+    <View style={{ marginTop: 8 }}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 4, gap: 10 }}
+      >
+        {cats.map((c) => {
+          const selected = value === c.key;
+          return (
+            <Pressable
+              key={c.key}
+              onPress={() => onChange?.(c.key)}
+              style={{
+                paddingVertical: 12,
+                paddingHorizontal: 16,
+                borderRadius: 999,
+                backgroundColor: selected ? Colors.primary : "#EEE9FF",
+              }}
             >
-              {LABELS[k]}
-            </Text>
-          </Pressable>
-        );
-      })}
+              <Text
+                style={{
+                  color: selected ? "#fff" : Colors.text,
+                  fontWeight: "700",
+                }}
+              >
+                {c.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
     </View>
   );
 }

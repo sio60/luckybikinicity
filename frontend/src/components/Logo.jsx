@@ -1,13 +1,18 @@
+// src/components/Logo.jsx
 import React from "react";
 import { Image, View } from "react-native";
 
-export default function Logo({ size = 120 }) {
+export default function Logo({ size = 120, rounded = false }) {
   return (
     <View style={{ alignItems: "center" }}>
-      {/* 프로젝트에 맞는 이미지로 교체하세요 (assets/icon.png 가 있다면 사용) */}
       <Image
         source={require("../../assets/icon.png")}
-        style={{ width: size, height: size, borderRadius: 24 }}
+        style={{
+          width: size,
+          height: size,
+          // 기본은 원(둥근) 제거. 필요 시 rounded={true}로 원형 표시 가능.
+          borderRadius: rounded ? Math.round(size / 2) : 0,
+        }}
         resizeMode="contain"
       />
     </View>
