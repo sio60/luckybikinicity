@@ -14,6 +14,7 @@ npm run start
 # 4) EAS 설치/로그인
 npm i -g eas-cli
 eas login
+eas logout
 
 # 5) EAS 프로젝트 연결(자동으로 app/eas 파일 생성/설정)
 eas build:configure
@@ -39,3 +40,4 @@ npx expo install react-native-gesture-handler
 rm -rf .eas
 eas update:configure
 npm i @react-native-async-storage/async-storage
+npx expo install react-native-google-mobile-ads

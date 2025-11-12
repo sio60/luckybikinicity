@@ -34,13 +34,13 @@
     "updates": {
       "url": "https://u.expo.dev/5aa4a8fd-07f6-4b64-9129-82797b9243d7"
     },
-    "extra": {
-      "eas": {
-        "projectId": "5aa4a8fd-07f6-4b64-9129-82797b9243d7"
-      }
-    },
     "plugins": [
       "react-native-google-mobile-ads"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "337197d0-d1e0-42b5-a27e-a97b681b5edc"
+      }
+    }
   }
 }
