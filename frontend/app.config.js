@@ -2,10 +2,8 @@
 import "dotenv/config";
 
 export default ({ config }) => ({
-  // 기존 config(expo 설정)를 먼저 펼치고
   ...config,
 
-  // 여기서부터는 네가 app.json에 넣어둔 값들 다시 명시
   name: "JujuPick",
   slug: "frontend",
   version: "1.0.0",
@@ -20,13 +18,12 @@ export default ({ config }) => ({
     backgroundColor: "#ffffff",
   },
 
-  ios: {
-    supportsTablet: true,
-  },
+  ios: { supportsTablet: true },
 
   android: {
-    softwareKeyboardLayoutMode: "resize",
+    ...config.android,
     package: "com.yunokio.frontend",
+    softwareKeyboardLayoutMode: "resize",
     windowSoftInputMode: "adjustResize",
     adaptiveIcon: {
       foregroundImage: "./assets/adaptive-icon.png",
@@ -35,34 +32,30 @@ export default ({ config }) => ({
     edgeToEdgeEnabled: true,
   },
 
-  web: {
-    favicon: "./assets/favicon.png",
-  },
+  web: { favicon: "./assets/favicon.png" },
 
-  runtimeVersion: {
-    policy: "appVersion",
-  },
-
+  // ✅ EAS Update 필수 설정
+  runtimeVersion: { policy: "appVersion" },
   updates: {
-    url: "https://u.expo.dev/5aa4a8fd-07f6-4b64-9129-82797b9243d7",
+    // 👉 방금 CLI가 알려준 URL 그대로 넣기
+    url: "https://u.expo.dev/337197d0-d1e0-42b5-a27e-a97b681b5edc",
   },
-
+  // (권장) EAS projectId도 동일하게 맞춰두기
   extra: {
+    ...(config.extra || {}),
     eas: {
-      projectId: "5aa4a8fd-07f6-4b64-9129-82797b9243d7",
+      projectId: "337197d0-d1e0-42b5-a27e-a97b681b5edc",
     },
   },
 
   plugins: [
     ...(config.plugins || []),
-
-    // ✅ AdMob 플러그인 + 앱 ID
     [
       "react-native-google-mobile-ads",
       {
         android_app_id:
           process.env.ANDROID_ADMOB_APP_ID ||
-          "ca-app-pub-3940256099942544~3347511713", // 테스트 App ID
+          "ca-app-pub-9291094321982391~1881530672", // 테스트 App ID
       },
     ],
   ],
